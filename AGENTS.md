@@ -11,4 +11,8 @@
 
 ## Verification
 
-Run `make check` inside `nix develop`. It runs `nix flake check`, which builds the home-manager activation package of `examples/basic.nix` and checks formatting. Extend `examples/basic.nix` when adding an option.
+Run `make check` inside `nix develop`. It runs `nix flake check`, which evaluates `examples/minimal.nix`, `practical.nix`, `supported-agents.nix` and `extras.nix` with a minimal home-manager configuration, builds the activation package of `examples/basic.nix`, checks that `README.md` contains each evaluated example verbatim, and checks formatting.
+
+- When an example changes, paste the new file into the matching code block of `README.md`; the `readme-examples` check fails until they match.
+- The configuration examples in `README.md` are those files; a new one becomes a file in `examples/` with its own `evalExample` check. The installation snippets (the consumer `flake.nix` and the NixOS / nix-darwin import) are checked by evaluating a scratch consumer flake with `--override-input nix-agents path:.`.
+- Extend `examples/basic.nix` when adding an option.
