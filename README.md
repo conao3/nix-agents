@@ -1,15 +1,42 @@
+<p align="center">
+  <img src="docs/assets/banner.png" alt="nix-agents: a home-manager module for running coding agents as multiple instances" width="880">
+</p>
+
+<p align="center"><strong>A home-manager module for running coding agents as multiple instances</strong></p>
+
+<p align="center">
+  <a href="https://github.com/conao3/nix-agents/actions/workflows/ci.yml"><img src="https://github.com/conao3/nix-agents/actions/workflows/ci.yml/badge.svg?branch=master" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/conao3/nix-agents" alt="License: Apache-2.0"></a>
+  <a href="https://github.com/conao3/nix-agents/stargazers"><img src="https://img.shields.io/github/stars/conao3/nix-agents?style=flat" alt="GitHub stars"></a>
+</p>
+
+<p align="center">
+  <a href="#what-it-solves">What it solves</a> ·
+  <a href="#supported-agents">Supported agents</a> ·
+  <a href="#installation">Installation</a> ·
+  <a href="#minimal-example">Minimal example</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#options">Options</a>
+</p>
+
 # nix-agents
 
-`nix-agents` is a [home-manager](https://github.com/nix-community/home-manager) module, `programs.agents`, for running command-line coding agents (Claude Code, Codex, pi, cursor-agent) as several independent **instances** on one machine.
+`nix-agents` is a [home-manager](https://github.com/nix-community/home-manager) module, `programs.agents`, that runs command-line coding agents (Claude Code, Codex, pi, cursor-agent) as several independent **instances** on 1 machine. You declare the instances, the MCP servers and the settings in Nix, and each instance gets its own executable and configuration directory:
+
+```console
+$ claude.personal   # runs claude with CLAUDE_CONFIG_DIR=~/.agents/.claude.personal
+$ claude.work       # runs claude with CLAUDE_CONFIG_DIR=~/.agents/.claude.work
+$ codex.personal    # runs codex with CODEX_HOME=~/.agents/.codex.personal
+```
 
 ## What it solves
 
-- **Several instances of one agent.** Each instance is an executable such as `claude.work` that runs the agent with its own configuration directory (`CLAUDE_CONFIG_DIR=~/.agents/.claude.work`). Accounts, credentials and state stay apart, while instances of the same agent can share one directory for projects, history and settings.
-- **One MCP server list for every agent.** MCP servers are declared once in `programs.agents.mcpServers` and rendered into each agent's own format: Claude Code's `settings.json` and `.claude.json`, Codex's `config.toml`, cursor-agent's `mcp.json`.
-- **Secrets outside the Nix store.** A server's credential is given as an environment variable name (`bearerTokenEnvVar`) or a file path (`bearerTokenFile`). For Claude Code the file is read at connection time by a generated `headersHelper` command. Only the name or the path is written to the store.
-- **Agents that rewrite their own configuration.** Agents write to the same files you want to manage (`settings.json`, `.claude.json`, `config.toml`). A read-only store symlink breaks them, and overwriting the file on every switch discards what they wrote. Each managed file picks a `strategy`: `merge` applies only the keys you declare to the existing file on activation, `overwrite` replaces the file with a fresh copy, and `link` keeps the usual read-only symlink.
+- **Several instances of one agent.** Each instance is an executable such as `claude.work` that runs the agent with its own configuration directory (`CLAUDE_CONFIG_DIR=~/.agents/.claude.work`). Accounts, credentials and state stay apart, and instances of the same agent can still share 1 directory for projects, history and settings.
+- **One MCP server list for all your agents.** You declare MCP servers once in `programs.agents.mcpServers`, and the module renders them into each agent's own format: Claude Code's `settings.json` and `.claude.json`, Codex's `config.toml`, cursor-agent's `mcp.json`.
+- **Secrets outside the Nix store.** You give a server's credential as an environment variable name (`bearerTokenEnvVar`) or a file path (`bearerTokenFile`). For Claude Code, a generated `headersHelper` command reads the file at connection time. The store holds the name or the path and nothing more.
+- **Agents that rewrite their own configuration.** Agents write to the same files you want to manage (`settings.json`, `.claude.json`, `config.toml`). A read-only store symlink breaks them, and a fresh copy on each switch discards what they wrote. Each managed file picks a `strategy`: `merge` applies the keys you declare to the existing file on activation and leaves the rest, `overwrite` replaces the file with a fresh copy, and `link` keeps the usual read-only symlink.
 
-The upstream home-manager modules `programs.claude-code`, `programs.codex` and `programs.mcp` manage one configuration directory per agent through store symlinks. Use `nix-agents` when you need several instances, shared directories, or files that the agent edits.
+The upstream home-manager modules `programs.claude-code`, `programs.codex` and `programs.mcp` manage 1 configuration directory per agent through store symlinks. Reach for `nix-agents` when you need several instances, shared directories, or files that the agent edits.
 
 ## Supported agents
 
@@ -20,9 +47,9 @@ The upstream home-manager modules `programs.claude-code`, `programs.codex` and `
 | pi | `pi-coding-agent` | `PI_CODING_AGENT_DIR` | | `AGENTS.md` | |
 | cursor-agent | `cursor-cli` (unfree) | `CURSOR_HOME` | | `AGENTS.md` | `cursor`: `mcp.json` (key `mcpServers`) |
 
-The module does not hard-code these agents: each one is an entry in `programs.agents.types` with an executable and the variable that selects its configuration directory. The table lists the values used in the examples below. Any agent that reads its configuration directory from an environment variable can be added the same way; MCP rendering is available for the three formats above.
+The module doesn't hard-code these agents. Each one is an entry in `programs.agents.types` with an executable and the variable that selects its configuration directory, and the table lists the values the examples below use. You can add any agent that reads its configuration directory from an environment variable the same way; MCP rendering covers the 3 formats above.
 
-This configuration declares all four:
+This configuration declares all 4:
 
 ```nix
 { pkgs, ... }:
@@ -75,7 +102,7 @@ This configuration declares all four:
 
 - Nix with flakes enabled.
 - home-manager used from a flake, either standalone (`home-manager.lib.homeManagerConfiguration`) or as a NixOS / nix-darwin module.
-- The flake is checked on `x86_64-linux`; it also declares `aarch64-darwin`. `mcpServers.<name>.service` creates systemd user services and is applied on Linux only.
+- The flake is checked on `x86_64-linux`; it also declares `aarch64-darwin`. `mcpServers.<name>.service` creates systemd user services and takes effect on Linux only.
 - `claude-code` and `cursor-cli` are unfree in nixpkgs. Set `config.allowUnfree = true` (or `allowUnfreePredicate`) on the `pkgs` you pass to home-manager.
 
 ## Installation
@@ -85,7 +112,7 @@ Add the flake input and import `homeManagerModules.default` into your home-manag
 ```nix
 {
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -121,7 +148,7 @@ Add the flake input and import `homeManagerModules.default` into your home-manag
 }
 ```
 
-`./agents.nix` holds the `programs.agents` configuration, for example the minimal one below. Activate it with `home-manager switch --flake .#alice`.
+`./agents.nix` holds the `programs.agents` configuration, such as the minimal one below. Activate it with `home-manager switch --flake .#alice`.
 
 With home-manager as a NixOS or nix-darwin module, pass `inputs` to home-manager (`home-manager.extraSpecialArgs = { inherit inputs; };`) and import the module from the user's configuration:
 
@@ -132,11 +159,11 @@ With home-manager as a NixOS or nix-darwin module, pass `inputs` to home-manager
 }
 ```
 
-The examples refer to `agentsLib`, a module argument that the module itself provides; no extra argument is needed.
+The examples refer to `agentsLib`, a module argument that the module provides on its own, so you don't pass anything extra.
 
 ## Minimal example
 
-Two Claude Code instances:
+2 Claude Code instances:
 
 ```nix
 { pkgs, ... }:
@@ -160,14 +187,14 @@ Two Claude Code instances:
 After `home-manager switch`:
 
 - `claude.personal` and `claude.work` are on `PATH`. Each runs `claude` with `CLAUDE_CONFIG_DIR` set to `~/.agents/.claude.personal` or `~/.agents/.claude.work`. Log in once per instance.
-- `claude` itself is installed from `types.claude.package`.
+- home-manager installs `claude` itself from `types.claude.package`.
 - `~/.agents`, `~/.agents/share` and both instance directories exist.
 
-Nothing is shared and no file is managed until you set `share` and `files`.
+The instances share nothing and the module manages no file until you set `share` and `files`.
 
 ## Practical example
 
-Two Claude Code instances and one Codex instance, sharing settings and history per agent, with shared instructions and two MCP servers, one authenticated from an environment variable and one from a key file:
+2 Claude Code instances and 1 Codex instance that share settings and history per agent, with shared instructions and 2 MCP servers. One server authenticates from an environment variable and the other from a key file:
 
 ```nix
 { pkgs, agentsLib, ... }:
@@ -283,22 +310,22 @@ Two Claude Code instances and one Codex instance, sharing settings and history p
 - **Executables:** `claude.personal`, `claude.work`, `codex.personal`, and `codex-default`, which runs `codex.personal`.
 - **Shared directories:** the Claude instances link their entries (projects, history, `settings.json`, `CLAUDE.md`, ...) to `~/.agents/.claude`; the Codex instance links to `~/.agents/.codex`. `.claude.json`, `.credentials.json` and `auth.json` stay in each instance directory as regular files.
 - **Instructions:** `./AGENTS.md` is linked as `~/.agents/share/AGENTS.md`, `~/.agents/.claude/CLAUDE.md` and `~/.agents/.codex/AGENTS.md`.
-- **`settings.json`** in `~/.claude` and `~/.agents/.claude` is merged on every activation:
-  - `theme`, `permissions.defaultMode` and `env.CLAUDE_CODE_ENABLE_TELEMETRY` are written when missing. If you changed one of them, your value is kept and a warning goes to `~/.claude/settings-warnings.log`.
-  - `env.DISABLE_TELEMETRY` is rewritten from `"1"` to `""` and left alone otherwise.
-  - `hooks` and `mcpServers` are replaced as a whole.
-  - Every other key the agent wrote is kept.
+- **`settings.json`** in `~/.claude` and `~/.agents/.claude` gets merged on each activation:
+  - The module writes `theme`, `permissions.defaultMode` and `env.CLAUDE_CODE_ENABLE_TELEMETRY` when they're missing. If you changed one of them, it keeps your value and logs a warning to `~/.claude/settings-warnings.log`.
+  - `env.DISABLE_TELEMETRY` changes from `"1"` to `""`; any other value stays.
+  - `hooks` and `mcpServers` get replaced as a whole.
+  - The other keys the agent wrote stay.
 - **`.claude.json`** in `~` and in each Claude instance directory receives `mcpServers` and keeps everything else (account, onboarding and project state).
-- **`config.toml`** in `~/.codex` and `~/.agents/.codex` gets `approval_policy`, `sandbox_mode` and `mcp_servers` set on every activation (`onConflict = "overwrite"`); trusted projects and other keys stay.
+- **`config.toml`** in `~/.codex` and `~/.agents/.codex` gets `approval_policy`, `sandbox_mode` and `mcp_servers` on each activation (`onConflict = "overwrite"`); trusted projects and other keys stay.
 - **MCP servers:**
   - `issues` reaches both agents. Claude Code gets `headers.Authorization = "Bearer ${ISSUES_API_KEY}"`, which it expands from its environment. Codex gets `bearer_token_env_var = "ISSUES_API_KEY"`.
-  - `search` reaches Claude Code only. It gets `headersHelper`, a shell command that reads `~/.config/search-mcp/key` each time the server connects. `enableFor = [ "claude" ]` is required because the Codex format has no equivalent; listing `codex` stops the evaluation with an error.
+  - `search` reaches Claude Code only. It gets `headersHelper`, a shell command that reads `~/.config/search-mcp/key` each time the server connects. The Codex format has no equivalent, so the server needs `enableFor = [ "claude" ]`; listing `codex` stops the evaluation with an error.
 
 Create the key file yourself (for example `install -m 600 /dev/stdin ~/.config/search-mcp/key`) and export `ISSUES_API_KEY` in the environment the agents start from.
 
 ## Wrappers, aliases, shell functions and services
 
-One Codex instance with an extra executable, an alias, a zsh function and a shared local MCP server:
+1 Codex instance with an extra executable, an alias, a zsh function and a shared local MCP server:
 
 ```nix
 { pkgs, lib, ... }:
@@ -347,74 +374,74 @@ One Codex instance with an extra executable, an alias, a zsh function and a shar
 
 ### Instances and wrappers
 
-An instance named `<type>.<suffix>` belongs to `types.<type>` (override with `instances.<name>.type`). Its directory is `<baseDir>/.<name>` relative to the home directory. The wrapper is generated with `makeWrapper`:
+An instance named `<type>.<suffix>` belongs to `types.<type>` (override it with `instances.<name>.type`). Its directory is `<baseDir>/.<name>` relative to the home directory. The module generates the wrapper with `makeWrapper`:
 
 ```sh
 export CLAUDE_CONFIG_DIR="$HOME/.agents/.claude.work"
 exec /nix/store/...-claude-code-.../bin/claude "$@"
 ```
 
-`types.<t>.executable` may point at any program, including a wrapper script of your own. `instances.<name>.wrapper.makeWrapperArgs` adds `makeWrapper` arguments, and `instances.<name>.extraWrappers.<exe>` creates more executables that use the same directory, such as a variant with extra flags. `aliases.<exe> = "<other exe>"` creates an executable that runs another one from `PATH`. The [extras example](#wrappers-aliases-shell-functions-and-services) uses both.
+`types.<t>.executable` can point at any program, including a wrapper script of your own. `instances.<name>.wrapper.makeWrapperArgs` adds `makeWrapper` arguments, and `instances.<name>.extraWrappers.<exe>` creates more executables that use the same directory, such as a variant with extra flags. `aliases.<exe> = "<other exe>"` creates an executable that runs another one from `PATH`. The [extras example](#wrappers-aliases-shell-functions-and-services) uses both.
 
 ### Shared directories and reconciliation
 
-With `types.<t>.share.enable = true`, the instances of that type (except those with `instances.<name>.share = false`) are reconciled into `share.dir` (default `<baseDir>/.<type>`) on every activation. Each instance directory is visited in name order:
+With `types.<t>.share.enable = true`, each activation reconciles the instances of that type (except those with `instances.<name>.share = false`) into `share.dir` (default `<baseDir>/.<type>`). The module visits the instance directories in name order:
 
-- Names in `share.exclude` stay in the instance. If one of them has become a symlink into the shared directory, it is turned back into a regular file with the linked content.
-- Symlinks are pointed at the shared directory.
-- Directories move into the shared directory. If the shared directory already has one, entries are added without overwriting.
-- Regular files are first copied to `<share.dir>.backup-<timestamp>/`, then:
-  - `share.history.file` (`history.jsonl`) is merged with the shared copy, deduplicated and sorted by `share.history.sortKey`;
+- Names in `share.exclude` stay in the instance. If one of them has become a symlink into the shared directory, the module turns it back into a regular file with the linked content.
+- Symlinks get pointed at the shared directory.
+- Directories move into the shared directory. If the shared directory already has one, the module adds the entries without overwriting.
+- Regular files get copied to `<share.dir>.backup-<timestamp>/` first, then:
+  - `share.history.file` (`history.jsonl`) gets merged with the shared copy, deduplicated and sorted by `share.history.sortKey`;
   - files matching `share.keepFirst` (`*.sqlite`, `*.sqlite-shm`, `*.sqlite-wal`) keep the copy that reached the shared directory first;
-  - names in `share.discard` and the instructions file are dropped;
+  - names in `share.discard` and the instructions file get dropped;
   - any other file keeps the newer copy.
-- The entries in `share.forceLinks`, the instructions file, the type's `config`-scoped files, and everything in the shared directory that the instance lacks are linked into the instance.
+- The module links into the instance the entries in `share.forceLinks`, the instructions file, the type's `config`-scoped files, and the rest of the shared directory that the instance lacks.
 
 ### State files stay per instance
 
-Claude Code keeps account and session state in `.claude.json` and saves it by writing `.claude.json.tmp` and renaming it over `.claude.json`. If the temporary file were a link into the shared directory, the rename would turn every instance's `.claude.json` into a link to one shared file. Excluding `.claude.json`, `.claude.json.tmp` and `.claude.json.*`, as in the practical example, keeps one regular `.claude.json` per instance; reconciliation and `merge` both convert such links back into regular files with the content they pointed to.
+Claude Code keeps account and session state in `.claude.json` and saves it by writing `.claude.json.tmp` and renaming it over `.claude.json`. If the temporary file were a link into the shared directory, the rename would turn the `.claude.json` of each instance into a link to 1 shared file. Excluding `.claude.json`, `.claude.json.tmp` and `.claude.json.*`, as the practical example does, keeps 1 regular `.claude.json` per instance; reconciliation and `merge` both convert such links back into regular files with the content they pointed to.
 
-Exclude `.credentials.json` (Claude Code) and `auth.json` (Codex) as well so that each instance keeps its own login.
+Exclude `.credentials.json` (Claude Code) and `auth.json` (Codex) too, so that each instance keeps its own login.
 
 ### Managed files and strategies
 
 `types.<t>.files.<name>` declares a file by its name inside the target directories:
 
 - `scope = "config"` (default): `homeDir` and the shared directory. Instances reach the shared copy through their links.
-- `scope = "instances"`: every instance directory of the type, including instances with `share = false`.
+- `scope = "instances"`: each instance directory of the type, including instances with `share = false`.
 - `extraTargets`: more paths relative to the home directory, such as `.claude.json`.
 
 `format` is `toml` for names ending in `.toml` and `json` otherwise. `strategy` decides how the content reaches each target:
 
 | Strategy | On activation | Use for |
 |---|---|---|
-| `merge` (default) | applies `settings` to the existing file and keeps every other key | files the agent writes: `settings.json`, `.claude.json`, `config.toml` |
-| `overwrite` | replaces the file with a copy generated from `settings` or `source` | files the agent may replace but should not keep changes to, such as cursor-agent's `mcp.json` |
+| `merge` (default) | applies `settings` to the existing file and keeps the other keys | files the agent writes: `settings.json`, `.claude.json`, `config.toml` |
+| `overwrite` | replaces the file with a copy generated from `settings` or `source` | files the agent may replace but shouldn't keep changes to, such as cursor-agent's `mcp.json` |
 | `link` | none; a read-only `home.file` symlink into the store | files the agent only reads |
 
-`settings` is an attribute set; attribute sets recurse and any other value is a leaf. It may also be a function of `{ dir }`, the absolute target directory. Under `merge`:
+`settings` is an attribute set; attribute sets recurse and any other value is a leaf. It can also be a function of `{ dir }`, the absolute target directory. Under `merge`:
 
 | Leaf | Effect |
 |---|---|
 | a plain value, `onConflict = "warn"` (default) | written when the key is missing; a different existing value is kept and reported |
-| a plain value, `onConflict = "overwrite"` | always written |
+| a plain value, `onConflict = "overwrite"` | written on each activation |
 | `agentsLib.force value` | the key is replaced by `value` as a whole |
 | `agentsLib.delete` | the key is removed |
 | `agentsLib.migrate { from = old; to = new; }` | `old` becomes `new`; any other value is kept and reported |
 
-A missing or empty file starts from `{}`. A target that is a symlink starts from the content it points to and becomes a regular file; the link target is not written. Each file is written to a new temporary file in the same directory and renamed into place. A file that does not parse as JSON or TOML stops the activation with an error. Conflicts are written to `warningsFile` as
+A missing or empty file starts from `{}`. A target that is a symlink starts from the content it points to and becomes a regular file; the module leaves the link target untouched. The module writes each file to a new temporary file in the same directory and renames it into place. A file that doesn't parse as JSON or TOML stops the activation with an error. Conflicts go to `warningsFile` as
 
 ```
 WARN: claude settings: /home/alice/.claude/settings.json: .theme: expected null or "dark", got "light", skipping
 ```
 
-and the file is recreated on every activation.
+and the module recreates the file on each activation.
 
-The operation list is generated with `builtins.toJSON` into the store and read by jq, so values are never interpolated into shell commands.
+The module generates the operation list with `builtins.toJSON` into the store and jq reads it from there, so no value ends up interpolated into a shell command.
 
 ### MCP servers
 
-`types.<t>.mcp = { format; key; files; }` names the format, the top-level key and the managed files that receive the servers. A server is sent to every type with `mcp` set unless `enableFor` lists the types explicitly.
+`types.<t>.mcp = { format; key; files; }` names the format, the top-level key and the managed files that receive the servers. A server goes to each type with `mcp` set unless `enableFor` lists the types.
 
 | Server option | `claude` | `codex` | `cursor` |
 |---|---|---|---|
@@ -424,16 +451,16 @@ The operation list is generated with `builtins.toJSON` into the store and read b
 | `bearerTokenEnvVar = "VAR"` | `headers.Authorization = "Bearer ${VAR}"` | `bearer_token_env_var` | `headers.Authorization = "Bearer ${VAR}"` |
 | `bearerTokenFile = "path"` | `headersHelper` reading `path` | evaluation error | evaluation error |
 
-`${VAR}` inside `url` or `headers` is passed through unchanged for agents that expand it themselves.
+`${VAR}` inside `url` or `headers` passes through unchanged for agents that expand it themselves.
 
-`mcpServers.<name>.service = { description; execStart; }` runs a local server once as the systemd user service `<name>-mcp`, so that every agent connects to the same process over HTTP instead of starting its own copy. The [extras example](#wrappers-aliases-shell-functions-and-services) runs the Playwright MCP server this way.
+`mcpServers.<name>.service = { description; execStart; }` runs a local server once as the systemd user service `<name>-mcp`, so that all your agents connect to the same process over HTTP instead of starting their own copies. The [extras example](#wrappers-aliases-shell-functions-and-services) runs the Playwright MCP server this way.
 
 ### Activation steps
 
-The module adds four `home.activation` entries, in this order:
+The module adds 4 `home.activation` entries, in this order:
 
 1. `agentsDirs` creates `baseDir`, `common.dir`, the shared directories and every instance directory.
-2. `agentsCommon` creates `common.ensureFiles` (empty, when missing) and `common.directories`.
+2. `agentsCommon` creates `common.ensureFiles` (empty, when they're missing) and `common.directories`.
 3. `agentsShare` reconciles the shared directories.
 4. `agentsFiles` writes `merge` and `overwrite` files.
 
@@ -441,7 +468,7 @@ Order your own steps with `lib.hm.dag.entryAfter [ "agentsDirs" ]` (or any of th
 
 ### Evaluation errors
 
-The configuration fails to evaluate when an instance names an unknown type, a shared instance sets `instructions`, a server sets both or neither of `url` and `command`, `enableFor` names a type without `mcp`, a server uses an option its format cannot express, or a `merge` file sets `source`.
+The configuration doesn't evaluate when an instance names an unknown type, a shared instance sets `instructions`, a server sets both or neither of `url` and `command`, `enableFor` names a type without `mcp`, a server uses an option its format can't express, or a `merge` file sets `source`.
 
 ## Options
 
@@ -453,7 +480,7 @@ All options live under `programs.agents`. Paths are relative to the home directo
 |---|---|---|---|
 | `enable` | bool | `false` | Enable the module. |
 | `baseDir` | string | `".agents"` | Parent of the instance and shared directories. |
-| `instructions` | null or path | `null` | Instructions file linked into `common.dir`, every shared directory and every instance outside a shared directory. |
+| `instructions` | null or path | `null` | Instructions file linked into `common.dir`, each shared directory and each instance outside a shared directory. |
 | `common.dir` | string | `"<baseDir>/share"` | Directory shared by all agents. |
 | `common.instructionsFile` | string | `"AGENTS.md"` | Name of the instructions file in `common.dir`. |
 | `common.directories` | list of strings | `[ ]` | Subdirectories created in `common.dir`. |
@@ -503,7 +530,7 @@ All options live under `programs.agents`. Paths are relative to the home directo
 |---|---|---|---|
 | `type` | string | text before the first `.` | Name in `types`. |
 | `dir` | string | `"<baseDir>/.<name>"` | Configuration directory. |
-| `share` | bool | `true` | Join the type's shared directory when it is enabled. |
+| `share` | bool | `true` | Join the type's shared directory when it's enabled. |
 | `instructions` | null or path | `null` | Instructions for an instance outside a shared directory; defaults to `programs.agents.instructions`. |
 | `wrapper.enable` | bool | `true` | Install the `<name>` executable. |
 | `wrapper.makeWrapperArgs` | list of strings | `[ ]` | Extra `makeWrapper` arguments. |
@@ -514,7 +541,7 @@ All options live under `programs.agents`. Paths are relative to the home directo
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `url` | null or string | `null` | Remote (HTTP) server. Set exactly one of `url` and `command`. |
+| `url` | null or string | `null` | Remote (HTTP) server. Set either `url` or `command`, and not both. |
 | `command` | null or string | `null` | Local (stdio) server. |
 | `args` | list of strings | `[ ]` | Arguments of `command`. |
 | `env` | attribute set of strings | `{ }` | Environment of `command`. |
@@ -527,7 +554,7 @@ All options live under `programs.agents`. Paths are relative to the home directo
 ## Limitations
 
 - Reconciliation and merging act on the top-level names of each directory.
-- The activation steps write files during `home-manager switch --dry-run` as well.
+- The activation steps write files during `home-manager switch --dry-run` too.
 - `zshFunctions` targets zsh only.
 - `mcpServers.<name>.service` targets systemd only.
 
@@ -542,7 +569,7 @@ make fmt     # nix fmt
 
 ## Origin
 
-The module was written in [conao3/nixos-configuration](https://github.com/conao3/nixos-configuration) to replace hand-written instance lists, wrappers, jq patch scripts and reconciliation shell for a set of Claude Code, Codex, pi and cursor-agent instances. That configuration now uses this flake as an input and produces the same system as before.
+The module started in [conao3/nixos-configuration](https://github.com/conao3/nixos-configuration), where it replaced hand-written instance lists, wrappers, jq patch scripts and reconciliation shell for a set of Claude Code, Codex, pi and cursor-agent instances. That configuration uses this flake as an input and produces the same system.
 
 ## License
 
