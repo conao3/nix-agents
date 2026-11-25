@@ -11,11 +11,11 @@
 </p>
 
 <p align="center">
-  <a href="#what-it-solves">What it solves</a> ·
-  <a href="#supported-agents">Supported agents</a> ·
-  <a href="#installation">Installation</a> ·
-  <a href="#minimal-example">Minimal example</a> ·
-  <a href="#how-it-works">How it works</a> ·
+  <a href="#what-it-solves">What it solves</a> |
+  <a href="#supported-agents">Supported agents</a> |
+  <a href="#installation">Installation</a> |
+  <a href="#minimal-example">Minimal example</a> |
+  <a href="#how-it-works">How it works</a> |
   <a href="#options">Options</a>
 </p>
 
