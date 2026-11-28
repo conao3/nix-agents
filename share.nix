@@ -100,6 +100,9 @@ in
     done
     for req in ${lib.concatStringsSep " " forceLinks}; do
       ${coreutils}/mkdir -p "$(${coreutils}/dirname "$p/$req")"
+      if [ "$p/$req" -ef "$shared/$req" ]; then
+        continue
+      fi
       ${coreutils}/ln -sfn "$shared/$req" "$p/$req"
     done
     for spath in "$shared"/*; do
